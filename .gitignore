@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+config.json
+music_config.json
+config.js
+bot.js
+test-api.js
+music_cache/
+*.zip
+*.log
+*.err
+.env

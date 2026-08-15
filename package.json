@@ -1,0 +1,17 @@
+{
+  "name": "highrise-ai-bot",
+  "version": "1.0.0",
+  "description": "Highrise AI Bot - Gemini gibi cevap veren bot",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "highrise-js-sdk": "latest",
+    "colors": "^1.4.0",
+    "@google/generative-ai": "^0.21.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
