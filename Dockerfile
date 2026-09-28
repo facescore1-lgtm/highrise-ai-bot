@@ -9,10 +9,6 @@ RUN apt-get update \
        curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -L -o /usr/local/bin/cloudflared \
-    https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
-    && chmod +x /usr/local/bin/cloudflared
-
 WORKDIR /app
 
 COPY requirements.txt .
@@ -23,6 +19,6 @@ COPY deploy/highrise__main__.py /usr/local/lib/python3.12/site-packages/highrise
 COPY . .
 COPY config.example.json config.json
 
-EXPOSE 8000 8001
+EXPOSE 10000
 
 CMD ["bash", "start.sh"]
