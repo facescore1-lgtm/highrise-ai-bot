@@ -37,7 +37,7 @@ def load_config():
 
 
 def start_health_server():
-    port = int(os.environ.get("PORT", "8001"))
+    port = int(os.environ.get("HEALTH_PORT", "8001"))
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
