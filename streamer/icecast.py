@@ -30,12 +30,12 @@ class IcecastStreamer:
         self._backoff = 1
         self._stderr_tail = []
         codecs = {
-            "mp3": ("-c:a", "libmp3lame", "mp3", "audio/mpeg"),
-            "aac": ("-c:a", "aac", "adts", "audio/aacp"),
-            "ogg": ("-c:a", "libvorbis", "ogg", "application/ogg"),
+            "mp3": (["-c:a", "libmp3lame"], "mp3", "audio/mpeg"),
+            "aac": (["-c:a", "aac"], "adts", "audio/aacp"),
+            "ogg": (["-c:a", "libvorbis"], "ogg", "application/ogg"),
         }
         codec = self.audio.get("codec", "mp3")
-        self.codec, self._enc_arg, self._fmt, self._content_type = codecs.get(codec, codecs["mp3"])
+        self._enc_arg, self._fmt, self._content_type = codecs.get(codec, codecs["mp3"])
 
     def current(self):
         return self._current
