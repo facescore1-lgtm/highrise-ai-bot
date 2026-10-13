@@ -96,6 +96,15 @@ ctrl = base.setdefault("control", {})
 ctrl["http"] = True
 ctrl["host"] = "127.0.0.1"
 ctrl["port"] = int(os.environ.get("CONTROL_PORT", "8090"))
+yt = base.setdefault("youtube", {})
+if os.environ.get("COOKIES_FILE"):
+    yt["cookies_file"] = os.environ["COOKIES_FILE"]
+elif os.environ.get("COOKIES_B64"):
+    import base64
+    data = base64.b64decode(os.environ["COOKIES_B64"])
+    with open("/app/cookies.txt", "wb") as fh:
+        fh.write(data)
+    yt["cookies_file"] = "/app/cookies.txt"
 with open("/app/config.json", "w", encoding="utf-8") as fh:
     json.dump(base, fh, ensure_ascii=False, indent=2)
 print("[start] config.json olusturuldu (icecast port %d, kontrol port %d)" % (ice["port"], ctrl["port"]), flush=True)
