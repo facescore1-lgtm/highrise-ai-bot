@@ -1,0 +1,59 @@
+{
+  "highrise": {
+    "room_id": "6a83afe77bc3d51abe4b900a",
+    "api_token": "",
+    "owner_username": "Slyshader_",
+    "pay_to": "",
+    "positions": {
+      "kat1": [8.0, 0.0, 7.0],
+      "kat2": [7.0, 5.5, 12.0],
+      "vip": [11.0, 11.0, 11.0]
+    }
+  },
+  "icecast": {
+    "host": "127.0.0.1",
+    "source_host": "127.0.0.1",
+    "port": 9000,
+    "mount": "/stream1",
+    "source_user": "source",
+    "source_password": "hackme",
+    "admin_user": "admin",
+    "admin_password": "hackme",
+    "name": "Highrise Radio",
+    "description": "Auto DJ",
+    "genre": "Various",
+    "url": "http://127.0.0.1:9000/stream1",
+    "public": 1
+  },
+  "audio": {
+    "codec": "mp3",
+    "bitrate": "192k",
+    "sample_rate": 44100,
+    "channels": 2
+  },
+  "playlist": {
+    "file": "",
+    "repeat": true,
+    "shuffle": true,
+    "random_search": true
+  },
+  "youtube": {
+    "cookies_file": "",
+    "proxy": ""
+  },
+  "invidious": {
+    "instances": [
+      "https://yewtu.be",
+      "https://inv.nadeko.net",
+      "https://invidious.nerdvpn.de",
+      "https://iv.ggtyler.dev",
+      "https://inv.tux.pizza",
+      "https://invidious.privacyredirect.com"
+    ]
+  },
+  "control": {
+    "http": true,
+    "host": "127.0.0.1",
+    "port": 8090
+  }
+}
