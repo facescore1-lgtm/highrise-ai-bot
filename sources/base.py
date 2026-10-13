@@ -15,3 +15,4 @@ class AudioItem:
     duration: int = 0
     stream_url_ts: float = 0.0
     stream_resolved: bool = False
+    is_radio: bool = False

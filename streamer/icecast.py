@@ -105,7 +105,11 @@ class IcecastStreamer:
             stream_url, headers = self._fresh_url(item)
         except ResolveError:
             raise
-        proc = self._spawn_ffmpeg(stream_url, headers)
+        proc = self._spawn_ffmpeg(
+            stream_url,
+            headers,
+            getattr(item, "duration", 0) if getattr(item, "is_radio", False) else 0,
+        )
         self._proc = proc
         threading.Thread(target=self._drain_stderr, args=(proc,), daemon=True).start()
         sock = self._ensure_socket(item, stream_url, headers)
@@ -141,6 +145,8 @@ class IcecastStreamer:
         return "ended"
 
     def _fresh_url(self, item):
+        if getattr(item, "is_radio", False):
+            return item.stream_url, item.headers
         if not item.stream_resolved or (time.time() - item.stream_url_ts) > 1200:
             fresh = self.resolver.resolve(item.url)
             item.url = fresh.url
@@ -153,7 +159,7 @@ class IcecastStreamer:
             item.stream_resolved = True
         return item.stream_url, item.headers
 
-    def _spawn_ffmpeg(self, stream_url, headers):
+    def _spawn_ffmpeg(self, stream_url, headers, duration=0):
         a = self.audio
         cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-re"]
         for k, v in (headers or {}).items():
@@ -162,6 +168,8 @@ class IcecastStreamer:
         cmd += ["-ac", str(a.get("channels", 2))]
         cmd += ["-ar", str(a.get("sample_rate", 44100))]
         cmd += ["-b:a", a.get("bitrate", "192k")]
+        if duration and duration > 0:
+            cmd += ["-t", str(int(duration))]
         cmd += list(self._enc_arg)
         cmd += ["-f", self._fmt, "pipe:1"]
         return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)

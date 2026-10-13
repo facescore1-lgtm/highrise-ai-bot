@@ -56,6 +56,18 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_SONG_SEC = 450   # bu sureden uzun sarkilar calinmaz ("cok uzun")
 
 
+# YouTube datacenter IP'lerinde (Render) SABR/PO-token nedeniyle cozulemedigi
+# icin otomatik radyo dogrudan Turk internet radyo stream'lerinden beslenir.
+DEFAULT_RADIO_STREAMS = [
+    {"name": "Power Türk", "url": "https://listen.powerapp.com.tr/powerturk/mpeg/icecast.audio"},
+    {"name": "Power Türk Taptaze", "url": "https://listen.powerapp.com.tr/powerturktaptaze/mpeg/icecast.audio"},
+    {"name": "Power Pop", "url": "https://listen.powerapp.com.tr/powerpop/mpeg/icecast.audio"},
+    {"name": "Power FM", "url": "https://listen.powerapp.com.tr/powerfm/mpeg/icecast.audio"},
+    {"name": "Power Love", "url": "https://listen.powerapp.com.tr/powerlove/mpeg/icecast.audio"},
+    {"name": "Power Dance", "url": "https://listen.powerapp.com.tr/powerdance/mpeg/icecast.audio"},
+]
+
+
 def build_logger():
     logger = logging.getLogger("radio")
     if not logger.handlers:
@@ -85,6 +97,15 @@ class RadioBot:
             shuffle=pl.get("shuffle", False),
         )
         self.random_search = bool(pl.get("random_search", False))
+        ry = config.get("radio", {}) or {}
+        self.radio_secs = int(ry.get("duration", 480))
+        streams = ry.get("streams") or DEFAULT_RADIO_STREAMS
+        self._radio_streams = [
+            (s.get("name") or "Radyo", s.get("url") or "")
+            for s in streams
+            if s.get("url")
+        ]
+        self._radio_idx = 0
         self.streamer = IcecastStreamer(config, self.resolver)
         self._running = False
         self._player_thread = None
@@ -300,7 +321,9 @@ class RadioBot:
                 req = self._requests.pop(0)
                 return req["url"], req.get("title"), True, req.get("requester")
             if not self.playlist.items or self.random_search:
-                # liste yok (veya random_search): tamamen rastgele YT aramasi
+                # liste yok (veya random_search): dogrudan Turk radyo stream'lerinden
+                if self._radio_streams:
+                    return self._pick_radio_url(), None, False, "2beatbot"
                 return random.choice(RANDOM_TR), None, False, "2beatbot"
             if first:
                 first = False
@@ -340,7 +363,19 @@ class RadioBot:
                         return None
                     continue
                 banned_streak = 0
-                if url.startswith("clip:"):
+                if url.startswith("radio:"):
+                    name, _, surl = url[6:].partition("|")
+                    item = AudioItem(
+                        url=url,
+                        title=name or "Radyo",
+                        stream_url=surl,
+                        source="radio",
+                        duration=self.radio_secs,
+                    )
+                    item.is_radio = True
+                    item.stream_resolved = True
+                    item.stream_url_ts = time.time()
+                elif url.startswith("clip:"):
                     item = AudioItem(
                         url=url,
                         title=hint or "Ses mesaji",
@@ -361,18 +396,19 @@ class RadioBot:
                         with self._lock:
                             self._requests.insert(0, {"url": url, "title": hint, "requester": ""})
                     continue
-                item.stream_resolved = True
-                item.stream_url_ts = time.time()
-                if getattr(item, "duration", 0) and item.duration > MAX_SONG_SEC:
-                    self.log.warning(
-                        "cok uzun sarki atlandi (%ds): %s", item.duration, item.title
-                    )
-                    long_streak += 1
-                    if long_streak > limit:
-                        self.log.warning("tum sarkilar 6 dk uzeri, radyo duruyor")
-                        return None
-                    continue
-                long_streak = 0
+                if not getattr(item, "is_radio", False):
+                    item.stream_resolved = True
+                    item.stream_url_ts = time.time()
+                    if getattr(item, "duration", 0) and item.duration > MAX_SONG_SEC:
+                        self.log.warning(
+                            "cok uzun sarki atlandi (%ds): %s", item.duration, item.title
+                        )
+                        long_streak += 1
+                        if long_streak > limit:
+                            self.log.warning("tum sarkilar 6 dk uzeri, radyo duruyor")
+                            return None
+                        continue
+                    long_streak = 0
                 item.requester = requester or ""
                 self._titles[url] = item.title
                 self.log.info("caliniyor: %s", item.title)
@@ -393,6 +429,11 @@ class RadioBot:
         except Exception as err:
             self.log.warning("URL cozulemedi (%.0fs): %s (%s)", timeout, url, err)
             return None
+
+    def _pick_radio_url(self):
+        name, surl = self._radio_streams[self._radio_idx % len(self._radio_streams)]
+        self._radio_idx += 1
+        return "radio:%s|%s" % (name, surl)
 
     def _player_loop(self):
         try:
