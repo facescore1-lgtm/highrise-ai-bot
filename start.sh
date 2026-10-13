@@ -56,7 +56,7 @@ cat > /app/icecast.xml <<EOF
 EOF
 
 rm -f /app/icecast.log
-/usr/bin/icecast2 -c /app/icecast.xml > /app/icecast.log 2>&1 &
+setpriv --reuid=nobody --regid=nogroup --clear-groups /usr/bin/icecast2 -c /app/icecast.xml > /app/icecast.log 2>&1 &
 ICECAST_PID=$!
 
 READY=0
