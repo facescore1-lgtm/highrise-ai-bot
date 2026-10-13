@@ -13,18 +13,6 @@ YDL_OPTS = {
     "retries": 2,
     "fragment_retries": 2,
     "noprogress": True,
-    "extractor_args": {
-        "youtube": {
-            "player_client": [
-                "tv_embedded",
-                "web_safari",
-                "android",
-                "ios",
-                "mweb",
-                "web_embedded",
-            ]
-        }
-    },
 }
 
 _YT_RE = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/|live/)|youtu\.be/)([\w-]{11})")
