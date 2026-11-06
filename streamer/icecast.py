@@ -117,15 +117,20 @@ class IcecastStreamer:
         self._started = time.time()
         sent = False
         self._sent_bytes = 0
+        self._last_progress = time.time()
 
         def _watchdog():
-            time.sleep(25)
-            if self._proc is proc and self._sent_bytes == 0 and not self._stop.is_set():
-                self.log.warning(
-                    "ffmpeg 25 sn boyunca ses uretmedi, akis yenileniyor (tail: %s)",
-                    self._tail(),
-                )
-                self._kill_ffmpeg(proc)
+            while not self._stop.is_set() and self._proc is proc:
+                time.sleep(4)
+                if self._proc is not proc:
+                    return
+                if time.time() - self._last_progress > 14:
+                    self.log.warning(
+                        "ffmpeg 14 sn ilerleme kaydetmedi (takildi), yeniden denenecek (tail: %s)",
+                        self._tail(),
+                    )
+                    self._kill_ffmpeg(proc)
+                    return
 
         threading.Thread(target=_watchdog, daemon=True).start()
         try:
@@ -148,6 +153,7 @@ class IcecastStreamer:
                 sock.sendall(b"\r\n")
                 sent = True
                 self._sent_bytes += len(chunk)
+                self._last_progress = time.time()
         except OSError as err:
             raise TransientError("icecast akisi kesildi: %s" % err) from err
         if self._skip.is_set():
