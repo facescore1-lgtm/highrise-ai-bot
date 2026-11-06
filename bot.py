@@ -97,6 +97,9 @@ class RadioBot:
             shuffle=pl.get("shuffle", False),
         )
         self.random_search = bool(pl.get("random_search", False))
+        # YouTube (yt-dlp) datacenter IP'lerinde calismadigi icin sarki istekleri
+        # varsayilan olarak kapali; config: requests.enabled
+        self.requests_enabled = bool((config.get("requests", {}) or {}).get("enabled", True))
         ry = config.get("radio", {}) or {}
         self.radio_secs = int(ry.get("duration", 480))
         streams = ry.get("streams") or DEFAULT_RADIO_STREAMS
@@ -593,6 +596,8 @@ class RadioBot:
         text = (query or "").strip()
         if not text:
             return "Kullanim: -p <sarki adi veya link>"
+        if not getattr(self, "requests_enabled", True):
+            return "🎵 Sarki istegi bu sunucuda kapali — sadece radyo caliyor."
         if requester and self._pending_requester_count(requester) >= 1:
             return "@%s kuyrukta zaten bir şarkın var. Sırasını yükseltmek için: -up" % requester
         try:

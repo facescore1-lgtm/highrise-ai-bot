@@ -917,6 +917,9 @@ class RadioRoomBot(BaseBot):
         await reply(title + "\n" + body)
 
     async def _cmd_play(self, user, sender, arg, reply):
+        if not getattr(self.radio, "requests_enabled", True):
+            await reply("🎵 Sarki istegi bu sunucuda kapali — sadece radyo caliyor.")
+            return
         if not arg:
             await reply("Kullanim: -p <sarki adi veya link>")
             return
@@ -1727,6 +1730,9 @@ class RadioRoomBot(BaseBot):
         return data
 
     async def _cmd_favekle(self, user, sender, arg, reply):
+        if not getattr(self.radio, "requests_enabled", True):
+            await reply("🎵 Sarki istegi bu sunucuda kapali — sadece radyo caliyor.")
+            return
         q = (arg or "").strip()
         if not q:
             await reply("Kullanim: -favekle <sarki adi veya link>")

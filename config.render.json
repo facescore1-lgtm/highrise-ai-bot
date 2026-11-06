@@ -37,6 +37,9 @@
     "shuffle": true,
     "random_search": true
   },
+  "requests": {
+    "enabled": false
+  },
   "youtube": {
     "cookies_file": "",
     "proxy": ""
