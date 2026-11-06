@@ -1742,7 +1742,7 @@ class RadioRoomBot(BaseBot):
             await reply("Favori listen dolu (20 sarki). Yer acmak icin: -favorisil <no> veya -favoritemizle")
             return
         try:
-            item = self.radio.resolver.resolve(q)
+            item = await asyncio.to_thread(self.radio.resolver.resolve, q)
         except Exception as err:
             await reply("Sarki bulunamadi: %s" % str(err)[:100])
             return
@@ -1806,7 +1806,7 @@ class RadioRoomBot(BaseBot):
             await reply("Gecersiz numara. Listen 1-%d arasi." % len(songs))
             return
         song = songs[idx]
-        msg = self.radio.request_song_text(song["url"], sender)
+        msg = await asyncio.to_thread(self.radio.request_song_text, song["url"], sender)
         await reply(msg if msg else "▶️ Favorin calasiyor: %s" % song.get("title", "?"))
 
     async def _cmd_favorisil(self, user, sender, arg, reply):

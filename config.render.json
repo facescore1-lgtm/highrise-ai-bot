@@ -38,7 +38,8 @@
     "random_search": true
   },
   "requests": {
-    "enabled": false
+    "enabled": true,
+    "provider": "soundcloud"
   },
   "youtube": {
     "cookies_file": "",
