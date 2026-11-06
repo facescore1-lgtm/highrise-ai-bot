@@ -94,6 +94,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(self.bot.cmd_shuffle(on in ("1", "true", "on")))
         elif path == "/reload":
             self._json(self.bot.cmd_reload())
+        elif path == "/request":
+            q = (params.get("q") or params.get("url") or "").strip()
+            who = params.get("user") or "api"
+            if not q:
+                self._json({"ok": False, "error": "q gerekli"}, 400)
+                return
+            msg = self.bot.request_song_text(q, who)
+            self._json({"ok": True, "message": msg or "kuyruga eklendi"})
         else:
             self._json({"error": "bulunamadi"}, 404)
 
