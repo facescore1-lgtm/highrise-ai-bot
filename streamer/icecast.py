@@ -1,5 +1,6 @@
 import base64
 import logging
+import queue
 import socket
 import subprocess
 import threading
@@ -15,10 +16,11 @@ class TransientError(Exception):
 
 
 class IcecastStreamer:
-    def __init__(self, config, resolver):
+    def __init__(self, config, resolver, relay=None):
         self.ice = config["icecast"]
         self.audio = config["audio"]
         self.resolver = resolver
+        self.relay = relay
         self.log = logging.getLogger("radio.streamer")
         self._stop = threading.Event()
         self._paused = threading.Event()
@@ -105,6 +107,8 @@ class IcecastStreamer:
             stream_url, headers = self._fresh_url(item)
         except ResolveError:
             raise
+        if self._use_relay(item):
+            return self._play_track_relay(item, stream_url, headers)
         proc = self._spawn_ffmpeg(
             stream_url,
             headers,
@@ -162,6 +166,63 @@ class IcecastStreamer:
         code = proc.wait()
         if code != 0 and not sent:
             raise TransientError("ffmpeg erken cikti (%d): %s" % (code, self._tail()))
+        return "ended"
+
+    def _use_relay(self, item):
+        """Sarki isteklerini ev cihazi uzerinden cal (radyo Render'da kalir)."""
+        if self.relay is None:
+            return False
+        if getattr(item, "is_radio", False):
+            return False
+        if getattr(item, "source", "") not in ("soundcloud", "youtube", "invidious"):
+            return False
+        return self.relay.available()
+
+    def _play_track_relay(self, item, stream_url, headers):
+        job = self.relay.play(
+            stream_url,
+            headers,
+            getattr(item, "duration", 0),
+            getattr(item, "title", ""),
+        )
+        if job is None:
+            raise TransientError("relay cihazi isi baslatamadi")
+        self.log.info("relay uzerinden caliyor: %s", getattr(item, "title", "?"))
+        sock = self._ensure_socket(item, stream_url, headers)
+        self._started = time.time()
+        sent = False
+        self._last_progress = time.time()
+        try:
+            while True:
+                if self._stop.is_set():
+                    return None
+                if self._paused.is_set():
+                    return "paused"
+                if self._skip.is_set():
+                    self._skip.clear()
+                    return "ended"
+                try:
+                    chunk = job.read(timeout=5)
+                except queue.Empty:
+                    if time.time() - self._last_progress > 20:
+                        raise TransientError("relay 20 sn ses gondermedi")
+                    continue
+                if not chunk:
+                    break
+                sock.sendall(b"%x\r\n" % len(chunk))
+                sock.sendall(chunk)
+                sock.sendall(b"\r\n")
+                sent = True
+                self._last_progress = time.time()
+        except OSError as err:
+            raise TransientError("icecast akisi kesildi: %s" % err) from err
+        finally:
+            self.relay.stop_job(job)
+        if self._skip.is_set():
+            self._skip.clear()
+            return "ended"
+        if job.error and not sent:
+            raise TransientError("relay hatasi: %s" % job.error)
         return "ended"
 
     def _fresh_url(self, item):

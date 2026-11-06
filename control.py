@@ -42,6 +42,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(self.bot.status())
         elif path == "/playlist":
             self._json({"playlist": self.bot.playlist_items()})
+        elif path == "/relay":
+            relay = getattr(self.bot, "relay", None)
+            self._json(relay.agent_info() if relay is not None else {"connected": False})
         else:
             self._json({"error": "bulunamadi"}, 404)
 

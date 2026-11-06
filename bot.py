@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from control import ControlApi
 from playlist import Playlist
+from relay_server import RelayServer
 from sources import ResolveError, build_resolver
 from sources.base import AudioItem
 from streamer.icecast import IcecastStreamer
@@ -109,7 +110,16 @@ class RadioBot:
             if s.get("url")
         ]
         self._radio_idx = 0
-        self.streamer = IcecastStreamer(config, self.resolver)
+        relay_cfg = config.get("relay", {}) or {}
+        self.relay = None
+        if relay_cfg.get("enabled"):
+            self.relay = RelayServer(
+                token=os.environ.get("RELAY_TOKEN") or relay_cfg.get("token", ""),
+                host=relay_cfg.get("host", "0.0.0.0"),
+                port=int(relay_cfg.get("port", 8111)),
+                log=self.log,
+            )
+        self.streamer = IcecastStreamer(config, self.resolver, relay=self.relay)
         self._running = False
         self._player_thread = None
         self._pending_advance = False
@@ -220,6 +230,7 @@ class RadioBot:
             "repeat": self.playlist.repeat,
             "shuffle": self.playlist.shuffle,
             "radio_url": self.radio_url(),
+            "home_relay": self.relay.available() if self.relay is not None else False,
         }
 
     def playlist_items(self):
@@ -796,6 +807,11 @@ def main():
         config = json.load(fh)
 
     bot = RadioBot(config, log=log, config_path=args.config)
+    if bot.relay is not None:
+        if bot.relay.start():
+            log.info("relay aktif: sarki istekleri ev cihazi uzerinden calacak")
+        else:
+            log.warning("relay baslatilamadi, istekler Render uzerinden denenecek")
     ctrl = None
     ctrl_cfg = config.get("control", {}) or {}
     if not args.no_http and ctrl_cfg.get("http", True):

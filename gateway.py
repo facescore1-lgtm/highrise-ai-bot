@@ -2,12 +2,14 @@ import http.client
 import json
 import os
 import socket
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 PORT = int(os.environ.get("PORT", "10000"))
 ICECAST_PORT = int(os.environ.get("ICECAST_PORT", "9000"))
 CTRL_PORT = int(os.environ.get("CONTROL_PORT", "8090"))
+RELAY_PORT = int(os.environ.get("RELAY_PORT", "8111"))
 
 CTRL_PREFIX = "/control"
 ICECAST_BUFFER_ROOTS = (
@@ -64,6 +66,8 @@ class Gateway(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path in ("/", "/health"):
             return self._health()
+        if path.startswith("/relay"):
+            return self._raw_pipe(RELAY_PORT)
         if path.startswith(CTRL_PREFIX):
             return self._relay(CTRL_PORT, path[len(CTRL_PREFIX):] or "/", "GET", None, self.headers.get("Content-Type"))
         if path.startswith("/stream"):
@@ -85,6 +89,62 @@ class Gateway(BaseHTTPRequestHandler):
             body,
             self.headers.get("Content-Type"),
         )
+
+    def _raw_pipe(self, port):
+        """WebSocket upgrade'i ham TCP olarak relay sunucusuna gecirir."""
+        try:
+            upstream = socket.create_connection(("127.0.0.1", port), timeout=10)
+        except OSError as err:
+            return self._json({"error": "relay kapali: %s" % err}, 502)
+        lines = ["GET %s HTTP/1.1" % self.path]
+        for k, v in self.headers.items():
+            lines.append("%s: %s" % (k, v))
+        lines.append("")
+        lines.append("")
+        try:
+            upstream.sendall("\r\n".join(lines).encode("latin-1"))
+        except OSError:
+            upstream.close()
+            return self._json({"error": "relay yanit vermedi"}, 502)
+        upstream.settimeout(None)
+        self.close_connection = True
+
+        def server_to_client():
+            try:
+                while True:
+                    data = upstream.recv(65536)
+                    if not data:
+                        break
+                    self.wfile.write(data)
+                    self.wfile.flush()
+            except OSError:
+                pass
+            finally:
+                try:
+                    upstream.shutdown(socket.SHUT_RD)
+                except OSError:
+                    pass
+
+        pump = threading.Thread(target=server_to_client, daemon=True)
+        pump.start()
+        try:
+            while True:
+                data = self.rfile.read1(65536)
+                if not data:
+                    break
+                upstream.sendall(data)
+        except OSError:
+            pass
+        finally:
+            try:
+                upstream.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
+            pump.join(timeout=5)
+            try:
+                upstream.close()
+            except OSError:
+                pass
 
     def _is_icecast_buffered(self, path):
         return any(path.startswith(root) for root in ICECAST_BUFFER_ROOTS)
