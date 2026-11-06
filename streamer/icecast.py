@@ -111,10 +111,23 @@ class IcecastStreamer:
             getattr(item, "duration", 0) if getattr(item, "is_radio", False) else 0,
         )
         self._proc = proc
+        self.log.info("ffmpeg kaynagi: %s", stream_url[:110])
         threading.Thread(target=self._drain_stderr, args=(proc,), daemon=True).start()
         sock = self._ensure_socket(item, stream_url, headers)
         self._started = time.time()
         sent = False
+        self._sent_bytes = 0
+
+        def _watchdog():
+            time.sleep(25)
+            if self._proc is proc and self._sent_bytes == 0 and not self._stop.is_set():
+                self.log.warning(
+                    "ffmpeg 25 sn boyunca ses uretmedi, akis yenileniyor (tail: %s)",
+                    self._tail(),
+                )
+                self._kill_ffmpeg(proc)
+
+        threading.Thread(target=_watchdog, daemon=True).start()
         try:
             while True:
                 if self._stop.is_set():
@@ -134,13 +147,14 @@ class IcecastStreamer:
                 sock.sendall(chunk)
                 sock.sendall(b"\r\n")
                 sent = True
+                self._sent_bytes += len(chunk)
         except OSError as err:
             raise TransientError("icecast akisi kesildi: %s" % err) from err
         if self._skip.is_set():
             self._skip.clear()
             return "ended"
         code = proc.wait()
-        if code != 0 and not sent and time.time() - self._started < 15:
+        if code != 0 and not sent:
             raise TransientError("ffmpeg erken cikti (%d): %s" % (code, self._tail()))
         return "ended"
 
@@ -161,9 +175,10 @@ class IcecastStreamer:
 
     def _spawn_ffmpeg(self, stream_url, headers, duration=0):
         a = self.audio
-        cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-re"]
+        cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "warning", "-re"]
         for k, v in (headers or {}).items():
             cmd += ["-headers", "%s: %s" % (k, v)]
+        cmd += ["-rw_timeout", "20000000"]
         cmd += ["-i", stream_url, "-map", "0:a:0", "-vn", "-sn", "-dn"]
         cmd += ["-ac", str(a.get("channels", 2))]
         cmd += ["-ar", str(a.get("sample_rate", 44100))]
